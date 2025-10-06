@@ -1,0 +1,70 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: hr_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: hr_database
+      POSTGRES_USER: hr_user
+      POSTGRES_PASSWORD: hr_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - hr_network
+
+  # NestJS Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hr_backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: hr_database
+      DATABASE_USER: hr_user
+      DATABASE_PASSWORD: hr_password
+      NODE_ENV: production
+      FORCE_SYNC: 'true'
+      # SMTP Configuration for email sending
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_SECURE: 'false'
+      SMTP_USER: naawarni@gmail.com
+      SMTP_PASS: kmbl lhlu vqxp vnpw
+      FROM_EMAIL: "Nawaarni<nawaarni@gmail.com>"
+    depends_on:
+      - postgres
+    networks:
+      - hr_network
+    volumes:
+      - ./src/upload:/app/src/upload
+
+  # pgAdmin for database management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: hr_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@hr.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    networks:
+      - hr_network
+
+volumes:
+  postgres_data:
+
+networks:
+  hr_network:
+    driver: bridge
