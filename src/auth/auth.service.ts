@@ -461,6 +461,7 @@ async getEtablissementName(idOrEmail: { id?: number; email?: string }): Promise<
   console.log('=== GET ETABLISSEMENT DEBUG ===');
   console.log('🏢 Etablissement ID:', etab.id);
   console.log('📋 Number of offers:', etab.etoffres?.length);
+  console.log('💳 Etablissement paymentStatus:', etab.paymentStatus);
   
   return etab;
 }
