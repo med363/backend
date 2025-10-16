@@ -40,6 +40,8 @@ export class EtablissementRegisterDto {
 
   @IsOptional()
   paymentHistory?: string[];
+@IsOptional()
+  paymentStatus: string; // 'payed', 'non_payed'
 
   @IsOptional()
   subscriptionStatus?: 'ACTIVE' | 'EXPIRED' | 'CANCELLED';

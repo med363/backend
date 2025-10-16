@@ -688,9 +688,8 @@ export class AuthController {
       phone: etab.phone,
       localisation: etab.localisation,
       paymentHistory: etab.paymentHistory,
-  paymentStatus: etab.paymentStatus,
-  payementStatus: etab.paymentStatus,
-  PaymentStatus: etab.paymentStatus,
+      paymentStatus: etab.paymentStatus,
+      // payementStatus: etab.payementStatus, // Deprecated field
       subscriptionPlan: etab.subscriptionPlan,
       subscriptionStatus: etab.subscriptionStatus,
       type: etab.type,
