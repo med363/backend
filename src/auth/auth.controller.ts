@@ -610,8 +610,10 @@ export class AuthController {
   async getArtisanName(@Query('id') id?: string, @Query('email') email?: string) {
     const artisan = await this.authService.getArtisanName({ id: id ? +id : undefined, email });
     if (!artisan) return null;
+    // Return a safe, complete artisan payload (exclude sensitive fields like password)
     return {
       id: artisan.id,
+      imageProofOfWork: artisan.imageProofOfWork,
       image: artisan.image,
       firstName: artisan.firstName,
       lastName: artisan.lastName,
@@ -623,10 +625,15 @@ export class AuthController {
       artisanCertification: artisan.artisanCertification,
       subscriptionPlan: artisan.subscriptionPlan,
       subscriptionStatus: artisan.subscriptionStatus,
+      paymentHistory: artisan.paymentHistory,
+      // canonical field
       paymentStatus: artisan.paymentStatus,
+      // French-aliased field used by some clients (keep for backwards-compatibility)
+      payementStatus: artisan.paymentStatus,
       subscriptionStartDate: artisan.subscriptionStartDate,
       subscriptionEndDate: artisan.subscriptionEndDate,
       disponibilite: artisan.disponibilite,
+      // offers and reviews with minimal fields
       offres: artisan.artoffres?.map(o => ({
         id: o.id,
         title: o.title,
@@ -639,6 +646,10 @@ export class AuthController {
         rate: a.rate,
         comment: a.comment,
       })) ?? [],
+      embauchedEtablissements: artisan.embauchedEtablissements?.map(e => ({
+        id: e.id,
+        nameOfEtablissement: e.nameOfEtablissement
+      })) ?? []
     };
   }
 
