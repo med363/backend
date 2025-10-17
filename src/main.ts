@@ -6,23 +6,23 @@ import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-
-  // Enable CORS for all origins (since nginx will handle external traffic)
+  
+  // Enable CORS for React Native app
   app.enableCors({
-    origin: true, // Allow all origins when behind nginx
+    origin: ['http://localhost:8081', 'http://192.168.1.16:8081', 'exp://localhost:19000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true,
   });
-
+  
   // Enable validation pipes
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     transform: true,
   }));
+  
+  const port = process.env.PORT || 3000;
 
-  const port = process.env.PORT || 3000;  // ← FIX: Change back to 3000
-
-  // Serve static files from upload directory
+  // Serve static files from upload directory - CORRECTED
   app.useStaticAssets(join(__dirname, '..', 'src', 'upload'), {
     prefix: '/upload/',
   });
@@ -30,7 +30,7 @@ async function bootstrap() {
   console.log('📁 Static files served from:', join(__dirname, '..', 'src', 'upload'));
   console.log('📁 Expected CV path: src/upload/user/CV/');
 
-  await app.listen(port, '0.0.0.0');  // ← FIX: Bind to all interfaces
-  console.log(`Application is running on: http://0.0.0.0:${port}`);
+  await app.listen(port);
+  console.log(`Application is running on: http://localhost:${port}`);
 }
 bootstrap();
