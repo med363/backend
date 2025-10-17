@@ -1,5 +1,4 @@
-
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { Artisan } from '../auth/entities/artisan.entity';
 
 @Entity('artoffres')
@@ -17,11 +16,19 @@ export class ArtOffre {
   prix: number;
 
   @Column({ type: 'varchar', nullable: true })
-  imageProofOfWork?: string;
+  imageProofOfWork: string;
 
   @Column({ type: 'text', nullable: true })
-  images?: string;
+  images: string;
 
-  @ManyToOne(() => Artisan, (artisan) => artisan.artoffres, { onDelete: 'CASCADE' })
+  // ManyToOne relationship with Artisan
+  @ManyToOne(() => Artisan, (artisan) => artisan.artoffres, { 
+    onDelete: 'CASCADE'
+  })
+  @JoinColumn({ name: 'artisanId' }) // This creates the foreign key
   artisan: Artisan;
+
+  // Add this column - it's required for the foreign key
+  @Column()
+  artisanId: number;
 }

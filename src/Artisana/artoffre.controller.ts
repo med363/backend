@@ -88,6 +88,23 @@ async createWithId(
     throw error; // Re-throw to see in Postman
   }
 }
+// Add this to your controller
+@Get('debug/check-artisan/:id')
+async checkArtisan(@Param('id') artisanId: number) {
+  const artisan = await this.artoffreService['artisanRepo'].findOne({
+    where: { id: artisanId }
+  });
+  
+  return {
+    artisanExists: !!artisan,
+    artisan: artisan ? {
+      id: artisan.id,
+      firstName: artisan.firstName,
+      lastName: artisan.lastName,
+      email: artisan.email
+    } : null
+  };
+}
 
   @Get('debug/all')
   async getAllOffersDebug() {
