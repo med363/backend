@@ -15,46 +15,49 @@ export class ArtOffreController {
     return this.artoffreService.createOffre(dto);
   }
 
-  @Post('create/id=:artisanId')
-  @UseInterceptors(FileFieldsInterceptor([
-    { name: 'images', maxCount: 10 },
-    { name: 'imageProofOfWork', maxCount: 1 }
-  ], {
-    storage: diskStorage({
-      destination: (req, file, callback) => {
-        const uploadPath = './src/upload/artisan/work-proof';
-        console.log('Uploading file to:', uploadPath);
-        callback(null, uploadPath);
-      },
-      filename: (req, file, callback) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const filename = `artisan-work-${uniqueSuffix}${extname(file.originalname)}`;
-        console.log('Generated filename:', filename);
-        callback(null, filename);
-      },
-    }),
-    fileFilter: (req, file, callback) => {
-      console.log('File filter check:', file.originalname, file.mimetype);
-      if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
-        return callback(new Error('Only image files are allowed!'), false);
-      }
-      callback(null, true);
+@Post('create/id=:artisanId')
+@UseInterceptors(FileFieldsInterceptor([
+  { name: 'images', maxCount: 10 },
+  { name: 'imageProofOfWork', maxCount: 1 }
+], {
+  storage: diskStorage({
+    destination: (req, file, callback) => {
+      const uploadPath = './src/upload/artisan/work-proof';
+      console.log('Uploading file to:', uploadPath);
+      callback(null, uploadPath);
     },
-  }))
-  async createWithId(
-    @Param('artisanId') artisanId: number, 
-    @Body() dto: any, // Use any to handle form data
-    @UploadedFiles() files: { images?: any[]; imageProofOfWork?: any[] }
-  ) {
+    filename: (req, file, callback) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const filename = `artisan-work-${uniqueSuffix}${extname(file.originalname)}`;
+      console.log('Generated filename:', filename);
+      callback(null, filename);
+    },
+  }),
+  fileFilter: (req, file, callback) => {
+    console.log('File filter check:', file.originalname, file.mimetype);
+    if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+      return callback(new Error('Only image files are allowed!'), false);
+    }
+    callback(null, true);
+  },
+}))
+async createWithId(
+  @Param('artisanId') artisanId: number, 
+  @Body() dto: any,
+  @UploadedFiles() files: { images?: any[]; imageProofOfWork?: any[] }
+) {
+  try {
     console.log('POST /artoffre/create/id=:artisanId called with artisanId:', artisanId);
     console.log('Request body:', dto);
-  const totalFiles = (files?.images?.length || 0) + (files?.imageProofOfWork?.length || 0);
-  console.log('Uploaded files count:', totalFiles);
+    
+    const totalFiles = (files?.images?.length || 0) + (files?.imageProofOfWork?.length || 0);
+    console.log('Uploaded files count:', totalFiles);
 
-  // Convert uploaded files to image paths array
-  const imagesFromImagesField = files?.images?.map(file => `/upload/artisan/work-proof/${file.filename}`) || [];
-  const imagesFromProofField = files?.imageProofOfWork?.map(file => `/upload/artisan/work-proof/${file.filename}`) || [];
-  const imagePaths = [...imagesFromImagesField, ...imagesFromProofField];
+    // Convert uploaded files to image paths array
+    const imagesFromImagesField = files?.images?.map(file => `/upload/artisan/work-proof/${file.filename}`) || [];
+    const imagesFromProofField = files?.imageProofOfWork?.map(file => `/upload/artisan/work-proof/${file.filename}`) || [];
+    const imagePaths = [...imagesFromImagesField, ...imagesFromProofField];
+    
     console.log('Generated image paths:', imagePaths);
     
     // Transform and validate the data from form
@@ -62,7 +65,6 @@ export class ArtOffreController {
       title: dto.title,
       description: dto.description,
       prix: parseFloat(dto.prix) || 0,
-      // prefer explicit imageProofOfWork field, otherwise use first uploaded image
       imageProofOfWork: imagesFromProofField[0] || imagePaths[0] || undefined,
     };
     
@@ -74,8 +76,18 @@ export class ArtOffreController {
       images: imagePaths
     };
     
-    return this.artoffreService.createOffre(fullDto);
+    console.log('Full DTO for service:', fullDto);
+    
+    const result = await this.artoffreService.createOffre(fullDto);
+    console.log('Service call successful:', result);
+    
+    return result;
+  } catch (error) {
+    console.error('Error in createWithId:', error);
+    console.error('Error stack:', error.stack);
+    throw error; // Re-throw to see in Postman
   }
+}
 
   @Get('debug/all')
   async getAllOffersDebug() {
