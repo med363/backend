@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, UploadedFiles, UseInterceptors } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { ArtOffreService } from './artoffre.service';
@@ -16,7 +16,10 @@ export class ArtOffreController {
   }
 
   @Post('create/id=:artisanId')
-  @UseInterceptors(FilesInterceptor('images', 10, {
+  @UseInterceptors(FileFieldsInterceptor([
+    { name: 'images', maxCount: 10 },
+    { name: 'imageProofOfWork', maxCount: 1 }
+  ], {
     storage: diskStorage({
       destination: (req, file, callback) => {
         const uploadPath = './src/upload/artisan/work-proof';
@@ -41,14 +44,17 @@ export class ArtOffreController {
   async createWithId(
     @Param('artisanId') artisanId: number, 
     @Body() dto: any, // Use any to handle form data
-    @UploadedFiles() files: any[]
+    @UploadedFiles() files: { images?: any[]; imageProofOfWork?: any[] }
   ) {
     console.log('POST /artoffre/create/id=:artisanId called with artisanId:', artisanId);
     console.log('Request body:', dto);
-    console.log('Uploaded files:', files?.length || 0);
-    
-    // Convert uploaded files to image paths array
-    const imagePaths = files?.map(file => `/upload/artisan/work-proof/${file.filename}`) || [];
+  const totalFiles = (files?.images?.length || 0) + (files?.imageProofOfWork?.length || 0);
+  console.log('Uploaded files count:', totalFiles);
+
+  // Convert uploaded files to image paths array
+  const imagesFromImagesField = files?.images?.map(file => `/upload/artisan/work-proof/${file.filename}`) || [];
+  const imagesFromProofField = files?.imageProofOfWork?.map(file => `/upload/artisan/work-proof/${file.filename}`) || [];
+  const imagePaths = [...imagesFromImagesField, ...imagesFromProofField];
     console.log('Generated image paths:', imagePaths);
     
     // Transform and validate the data from form
@@ -56,7 +62,8 @@ export class ArtOffreController {
       title: dto.title,
       description: dto.description,
       prix: parseFloat(dto.prix) || 0,
-      imageProofOfWork: imagePaths[0] || undefined,
+      // prefer explicit imageProofOfWork field, otherwise use first uploaded image
+      imageProofOfWork: imagesFromProofField[0] || imagePaths[0] || undefined,
     };
     
     console.log('Transformed DTO:', transformedDto);
