@@ -18,6 +18,8 @@ import { SubscriptionCheckerService } from './subscription-checker.service';
 export class AuthService {
   // --- Password Reset ---
   private resetCodes: Map<string, string> = new Map(); // email -> code
+  // --- Email verification codes (non-persistent) ---
+  private verificationCodes: Map<string, string> = new Map(); // key: role|email -> code
 
   async requestResetPasswordCode(email: string) {
     // Check if user exists
@@ -33,6 +35,42 @@ export class AuthService {
   // Send code by email (custom for password reset)
   await this.mailService.sendPasswordResetCode(email, code);
     return { message: 'Code sent to email' };
+  }
+
+  // --- Email verification helpers ---
+  private buildVerificationKey(role: string, email: string) {
+    return `${role}|${email}`;
+  }
+
+  async sendVerificationCodeFor(role: string, email: string) {
+    // Ensure the target exists
+    let entityExists = false;
+    if (role === 'user') {
+      entityExists = !!(await this.userRepo.findOne({ where: { email } }));
+    } else if (role === 'artisan') {
+      entityExists = !!(await this.artisanRepo.findOne({ where: { email } }));
+    } else if (role === 'etablissement') {
+      entityExists = !!(await this.etabRepo.findOne({ where: { email } }));
+    } else {
+      throw new BadRequestException('Invalid role');
+    }
+
+    if (!entityExists) throw new BadRequestException('Email not found');
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const key = this.buildVerificationKey(role, email);
+    this.verificationCodes.set(key, code);
+    await this.mailService.sendVerificationCode(email, code);
+    return { message: 'Verification code sent' };
+  }
+
+  async verifyEmailCodeFor(role: string, email: string, code: string) {
+    const key = this.buildVerificationKey(role, email);
+    const saved = this.verificationCodes.get(key);
+    if (!saved || saved !== code) throw new BadRequestException('Invalid verification code');
+    // For now we do not persist verification flag; just remove the code and return success
+    this.verificationCodes.delete(key);
+    return { message: 'Email verified' };
   }
 
   async verifyResetPasswordCode(email: string, code: string) {
