@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Param, Post, UploadedFiles, UseInterceptors } from '@nestjs/common';
-import { FilesInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
+import * as fs from 'fs';
 import { ArtOffreService } from './artoffre.service';
 import { ArtOffreDto } from './dto/artoffre.dto';
 import { ArtOffreCreateDto } from './dto/artoffre-create.dto';
@@ -15,49 +16,49 @@ export class ArtOffreController {
     return this.artoffreService.createOffre(dto);
   }
 
-@Post('create/id=:artisanId')
-@UseInterceptors(FileFieldsInterceptor([
-  { name: 'images', maxCount: 10 },
-  { name: 'imageProofOfWork', maxCount: 1 }
-], {
-  storage: diskStorage({
-    destination: (req, file, callback) => {
-      const uploadPath = './src/upload/artisan/work proof';
-      console.log('Uploading file to:', uploadPath);
-      callback(null, uploadPath);
+  @Post('create/id=:artisanId')
+  @UseInterceptors(FilesInterceptor('images', 10, {
+    storage: diskStorage({
+      destination: (req, file, callback) => {
+        // Use an absolute path under the project 'src/upload/artisan/work proof'
+        const uploadPath = join(process.cwd(), 'src', 'upload', 'artisan', 'work proof');
+        try {
+          if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+            console.log('Created upload directory:', uploadPath);
+          }
+        } catch (e) {
+          console.error('Could not ensure upload directory exists:', e);
+        }
+        console.log('Uploading file to:', uploadPath);
+        callback(null, uploadPath);
+      },
+      filename: (req, file, callback) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const filename = `artisan-work-${uniqueSuffix}${extname(file.originalname)}`;
+        console.log('Generated filename:', filename);
+        callback(null, filename);
+      },
+    }),
+    fileFilter: (req, file, callback) => {
+      console.log('File filter check:', file.originalname, file.mimetype);
+      if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+        return callback(new Error('Only image files are allowed!'), false);
+      }
+      callback(null, true);
     },
-    filename: (req, file, callback) => {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      const filename = `artisan-work-${uniqueSuffix}${extname(file.originalname)}`;
-      console.log('Generated filename:', filename);
-      callback(null, filename);
-    },
-  }),
-  fileFilter: (req, file, callback) => {
-    console.log('File filter check:', file.originalname, file.mimetype);
-    if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
-      return callback(new Error('Only image files are allowed!'), false);
-    }
-    callback(null, true);
-  },
-}))
-async createWithId(
-  @Param('artisanId') artisanId: number, 
-  @Body() dto: any,
-  @UploadedFiles() files: { images?: any[]; imageProofOfWork?: any[] }
-) {
-  try {
+  }))
+  async createWithId(
+    @Param('artisanId') artisanId: number, 
+    @Body() dto: any, // Use any to handle form data
+    @UploadedFiles() files: any[]
+  ) {
     console.log('POST /artoffre/create/id=:artisanId called with artisanId:', artisanId);
     console.log('Request body:', dto);
+    console.log('Uploaded files:', files?.length || 0);
     
-    const totalFiles = (files?.images?.length || 0) + (files?.imageProofOfWork?.length || 0);
-    console.log('Uploaded files count:', totalFiles);
-
     // Convert uploaded files to image paths array
-    const imagesFromImagesField = files?.images?.map(file => `/upload/artisan/work-proof/${file.filename}`) || [];
-    const imagesFromProofField = files?.imageProofOfWork?.map(file => `/upload/artisan/work-proof/${file.filename}`) || [];
-    const imagePaths = [...imagesFromImagesField, ...imagesFromProofField];
-    
+  const imagePaths = files?.map(file => `/upload/artisan/work proof/${file.filename}`) || [];
     console.log('Generated image paths:', imagePaths);
     
     // Transform and validate the data from form
@@ -65,7 +66,7 @@ async createWithId(
       title: dto.title,
       description: dto.description,
       prix: parseFloat(dto.prix) || 0,
-      imageProofOfWork: imagesFromProofField[0] || imagePaths[0] || undefined,
+      imageProofOfWork: imagePaths[0] || undefined,
     };
     
     console.log('Transformed DTO:', transformedDto);
@@ -76,35 +77,8 @@ async createWithId(
       images: imagePaths
     };
     
-    console.log('Full DTO for service:', fullDto);
-    
-    const result = await this.artoffreService.createOffre(fullDto);
-    console.log('Service call successful:', result);
-    
-    return result;
-  } catch (error) {
-    console.error('Error in createWithId:', error);
-    console.error('Error stack:', error.stack);
-    throw error; // Re-throw to see in Postman
+    return this.artoffreService.createOffre(fullDto);
   }
-}
-// Add this to your controller
-@Get('debug/check-artisan/:id')
-async checkArtisan(@Param('id') artisanId: number) {
-  const artisan = await this.artoffreService['artisanRepo'].findOne({
-    where: { id: artisanId }
-  });
-  
-  return {
-    artisanExists: !!artisan,
-    artisan: artisan ? {
-      id: artisan.id,
-      firstName: artisan.firstName,
-      lastName: artisan.lastName,
-      email: artisan.email
-    } : null
-  };
-}
 
   @Get('debug/all')
   async getAllOffersDebug() {
