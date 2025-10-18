@@ -45,23 +45,6 @@ export class AuthController {
     return this.authService.resetPasswordWithCode(body.email, body.code, body.newPassword, body.confirmPassword);
   }
 
-  // --- Email verification endpoints ---
-  @Post('verify-email/:role')
-  async verifyEmail(@Param('role') role: string, @Body() body: { email: string; code: string }) {
-    if (!body?.email || !body?.code) {
-      throw new BadRequestException('email and code are required');
-    }
-    return this.authService.verifyEmailCodeFor(role, body.email, body.code);
-  }
-
-  @Post('resend-verification/:role')
-  async resendVerification(@Param('role') role: string, @Body() body: { email: string }) {
-    if (!body?.email) {
-      throw new BadRequestException('email is required');
-    }
-    return this.authService.sendVerificationCodeFor(role, body.email);
-  }
-
   // --- Subscription Status Endpoints ---
   @Get('subscription-status/user/:email')
   async getUserSubscriptionStatus(@Param('email') email: string) {
