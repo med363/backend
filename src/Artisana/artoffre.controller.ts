@@ -22,7 +22,7 @@ export class ArtOffreController {
 ], {
   storage: diskStorage({
     destination: (req, file, callback) => {
-      const uploadPath = './src/upload/artisan/work-proof';
+      const uploadPath = './src/upload/artisan/work proof';
       console.log('Uploading file to:', uploadPath);
       callback(null, uploadPath);
     },
