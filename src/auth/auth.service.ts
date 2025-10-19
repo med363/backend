@@ -271,6 +271,10 @@ export class AuthService {
 
       if (data.role === Role.ARTISANA) {
         const artisanData = data as any;
+        const now = new Date();
+        const endDate = new Date(now.getTime());
+        endDate.setDate(endDate.getDate() + 30);
+
         const artisan = this.artisanRepo.create({
           image: artisanData.image,
           lastName: artisanData.lastName,
@@ -284,6 +288,10 @@ export class AuthService {
           artisanExperience: artisanData.artisanExperience ?? undefined,
           artisanCertification: artisanData.artisanCertification ?? undefined,
           disponibilite: artisanData.disponibilite ?? 'Disponible',
+          // Set initial subscription window at registration
+          subscriptionStartDate: now,
+          subscriptionEndDate: endDate,
+          subscriptionStatus: 'ACTIVE',
         });
         const savedArtisan = await this.artisanRepo.save(artisan);
         await this.mailService.sendVerificationCode(savedArtisan.email, verificationCode);
@@ -296,6 +304,10 @@ export class AuthService {
           throw new Error('nameOfEtablissement is required');
         }
         const etabType = etabData.type ?? 'Startup';
+        const now = new Date();
+        const endDate = new Date(now.getTime());
+        endDate.setDate(endDate.getDate() + 30);
+
         const etab = this.etabRepo.create({
           image: etabData.image,
           nameOfEtablissement: etabData.nameOfEtablissement,
@@ -309,6 +321,9 @@ export class AuthService {
           password: hashed,
           confirmPassword: hashed,
           type: etabType,
+          subscriptionStartDate: now,
+          subscriptionEndDate: endDate,
+          subscriptionStatus: 'ACTIVE',
         });
         const savedEtab = await this.etabRepo.save(etab);
         await this.mailService.sendVerificationCode(savedEtab.email, verificationCode);
@@ -316,6 +331,10 @@ export class AuthService {
       }
 
       const userData = data as any;
+      const now = new Date();
+      const endDate = new Date(now.getTime());
+      endDate.setDate(endDate.getDate() + 30);
+
       const user = this.userRepo.create({
         image: userData.image,
         lastName: userData.lastName,
@@ -325,6 +344,10 @@ export class AuthService {
         dateOfBirth: userData.dateOfBirth ? new Date(userData.dateOfBirth) : undefined,
         password: hashed,
         confirmPassword: hashed
+      ,
+        subscriptionStartDate: now,
+        subscriptionEndDate: endDate,
+        subscriptionStatus: 'ACTIVE',
       });
       const savedUser = await this.userRepo.save(user);
       await this.mailService.sendVerificationCode(savedUser.email, verificationCode);
@@ -668,9 +691,20 @@ async debugUpdateOfferId(requestId: number, offerId: number) {
       throw new BadRequestException(`${entityLabel} not found`);
     }
 
-    await repository.update(entity.id, { paymentStatus } as any);
+    const updatePayload: any = { paymentStatus };
 
-    return { message: `${entityLabel} payment status updated successfully`, paymentStatus };
+    if (paymentStatus === 'payed') {
+      const now = new Date();
+      const endDate = new Date(now.getTime());
+      endDate.setDate(endDate.getDate() + 30);
+      updatePayload.subscriptionStartDate = now;
+      updatePayload.subscriptionEndDate = endDate;
+      updatePayload.subscriptionStatus = 'ACTIVE';
+    }
+
+    await repository.update(entity.id, updatePayload as any);
+
+    return { message: `${entityLabel} payment status updated successfully`, paymentStatus, updated: updatePayload };
   }
 
   // --- Update user profile image ---
