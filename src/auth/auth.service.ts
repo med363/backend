@@ -395,54 +395,6 @@ export class AuthService {
   async getAllArtisans() {
     return this.artisanRepo.find();
   }
-  // --- Verify email with code for a given role. Returns user data and userType.
-  async verifyEmail(role: string, email: string, code: string) {
-    try {
-      if (!email || !code) throw new BadRequestException('Email and code are required');
-
-      const savedCode = this.verificationCodes.get(email);
-      if (!savedCode || savedCode !== code) {
-        throw new BadRequestException('Invalid verification code');
-      }
-
-      // Find the account depending on role
-      let account: any = null;
-      let userType: 'user' | 'artisan' | 'etablissement' = 'user';
-
-      if (role === 'artisan') {
-        account = await this.artisanRepo.findOne({ where: { email } });
-        userType = 'artisan';
-      } else if (role === 'etablissement') {
-        account = await this.etabRepo.findOne({ where: { email } });
-        userType = 'etablissement';
-      } else {
-        account = await this.userRepo.findOne({ where: { email } });
-        userType = 'user';
-      }
-
-      if (!account) throw new BadRequestException('Account not found');
-
-      // Mark as verified if model has a field (best-effort)
-      try {
-        if ('isVerified' in account) {
-          await this.artisanRepo.manager.update(account.constructor, account.id, { isVerified: true });
-        }
-      } catch (e) {
-        // ignore update failures
-      }
-
-      // Remove verification code once used
-      this.verificationCodes.delete(email);
-
-      const { password: _, confirmPassword: __, ...accountWithoutPassword } = account;
-
-      // Return account data and userType. Note: no JWT is issued here; frontend can call login if a token is needed.
-      return { user: accountWithoutPassword, userType, message: 'Email verified' };
-    } catch (error) {
-      console.error('❌ verifyEmail error:', error);
-      throw new BadRequestException(error?.message || 'Verification failed');
-    }
-  }
 
   // --- Get artisans by specialty ---
   async getArtisansBySpecialty(specialty: string) {
@@ -508,14 +460,77 @@ export class AuthService {
       if (!isPasswordValid) throw new UnauthorizedException('Invalid email or password');
 
       const { password: _, confirmPassword: __, ...userWithoutPassword } = user;
-      return { user: userWithoutPassword, userType, message: 'Login successful' };
+
+      // Sign a JWT token (short helper). In production, use env var for secret and expiration.
+      const token = this.signToken({ id: userWithoutPassword.id, email: userWithoutPassword.email, userType });
+
+      return { user: userWithoutPassword, userType, token, message: 'Login successful' };
     } catch (error) {
       console.error('❌ Login error:', error);
       throw new BadRequestException('Login failed');
     }
   }
 
+  private signToken(payload: object) {
+    try {
+      const secret = process.env.JWT_SECRET || 'please-change-this-secret';
+      // default expiration 7 days
+      return jwt.sign(payload, secret, { expiresIn: '7d' });
+    } catch (e) {
+      console.error('JWT sign error:', e);
+      return null;
+    }
+  }
 
+  // --- Verify email with code for a given role. Returns user data and userType.
+  async verifyEmail(role: string, email: string, code: string) {
+    try {
+      if (!email || !code) throw new BadRequestException('Email and code are required');
+
+      const savedCode = this.verificationCodes.get(email);
+      if (!savedCode || savedCode !== code) {
+        throw new BadRequestException('Invalid verification code');
+      }
+
+      // Find the account depending on role
+      let account: any = null;
+      let userType: 'user' | 'artisan' | 'etablissement' = 'user';
+
+      if (role === 'artisan') {
+        account = await this.artisanRepo.findOne({ where: { email } });
+        userType = 'artisan';
+      } else if (role === 'etablissement') {
+        account = await this.etabRepo.findOne({ where: { email } });
+        userType = 'etablissement';
+      } else {
+        account = await this.userRepo.findOne({ where: { email } });
+        userType = 'user';
+      }
+
+      if (!account) throw new BadRequestException('Account not found');
+
+      // Mark as verified if model has a field (best-effort)
+      try {
+        if ('isVerified' in account) {
+          await this.artisanRepo.manager.update(account.constructor, account.id, { isVerified: true });
+        }
+      } catch (e) {
+        // ignore update failures
+      }
+
+      // Remove verification code once used
+      this.verificationCodes.delete(email);
+
+      const { password: _, confirmPassword: __, ...accountWithoutPassword } = account;
+
+  // Return account data and userType along with a JWT so frontend can auto-login
+  const token = this.signToken({ id: accountWithoutPassword.id, email: accountWithoutPassword.email, userType });
+  return { user: accountWithoutPassword, userType, token, message: 'Email verified' };
+    } catch (error) {
+      console.error('❌ verifyEmail error:', error);
+      throw new BadRequestException(error?.message || 'Verification failed');
+    }
+  }
 
   // --- Get User Name ---
   async getUserName(idOrEmail: { id?: number; email?: string }) {
