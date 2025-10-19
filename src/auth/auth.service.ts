@@ -271,6 +271,13 @@ export class AuthService {
 
       if (data.role === Role.ARTISANA) {
         const artisanData = data as any;
+        // Prevent duplicate email across all account types
+        const existingEmailArtisan = await this.userRepo.findOne({ where: { email: artisanData.email } }) ||
+                                   await this.artisanRepo.findOne({ where: { email: artisanData.email } }) ||
+                                   await this.etabRepo.findOne({ where: { email: artisanData.email } });
+        if (existingEmailArtisan) {
+          throw new BadRequestException('Email already exists');
+        }
         const now = new Date();
         const endDate = new Date(now.getTime());
         endDate.setDate(endDate.getDate() + 30);
@@ -292,6 +299,7 @@ export class AuthService {
           subscriptionStartDate: now,
           subscriptionEndDate: endDate,
           subscriptionStatus: 'ACTIVE',
+          paymentStatus: 'non_payed',
         });
         const savedArtisan = await this.artisanRepo.save(artisan);
         await this.mailService.sendVerificationCode(savedArtisan.email, verificationCode);
@@ -307,6 +315,14 @@ export class AuthService {
         const now = new Date();
         const endDate = new Date(now.getTime());
         endDate.setDate(endDate.getDate() + 30);
+
+        // Prevent duplicate email across all account types
+        const existingEmailEtab = await this.userRepo.findOne({ where: { email: etabData.email } }) ||
+                                 await this.artisanRepo.findOne({ where: { email: etabData.email } }) ||
+                                 await this.etabRepo.findOne({ where: { email: etabData.email } });
+        if (existingEmailEtab) {
+          throw new BadRequestException('Email already exists');
+        }
 
         const etab = this.etabRepo.create({
           image: etabData.image,
@@ -324,6 +340,7 @@ export class AuthService {
           subscriptionStartDate: now,
           subscriptionEndDate: endDate,
           subscriptionStatus: 'ACTIVE',
+          paymentStatus: 'non_payed',
         });
         const savedEtab = await this.etabRepo.save(etab);
         await this.mailService.sendVerificationCode(savedEtab.email, verificationCode);
@@ -334,6 +351,14 @@ export class AuthService {
       const now = new Date();
       const endDate = new Date(now.getTime());
       endDate.setDate(endDate.getDate() + 30);
+
+      // Prevent duplicate email across all account types
+      const existingEmailUser = await this.userRepo.findOne({ where: { email: userData.email } }) ||
+                               await this.artisanRepo.findOne({ where: { email: userData.email } }) ||
+                               await this.etabRepo.findOne({ where: { email: userData.email } });
+      if (existingEmailUser) {
+        throw new BadRequestException('Email already exists');
+      }
 
       const user = this.userRepo.create({
         image: userData.image,
@@ -348,6 +373,7 @@ export class AuthService {
         subscriptionStartDate: now,
         subscriptionEndDate: endDate,
         subscriptionStatus: 'ACTIVE',
+        paymentStatus: 'non_payed',
       });
       const savedUser = await this.userRepo.save(user);
       await this.mailService.sendVerificationCode(savedUser.email, verificationCode);
