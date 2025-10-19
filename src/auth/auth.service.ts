@@ -13,11 +13,14 @@ import { ArtOffre } from '../Artisana/artoffre.entity';
 import { EmbaucheRequest } from './entities/embauche-request.entity';
 import { OrderService } from '../etablissements/order/order.service';
 import { SubscriptionCheckerService } from './subscription-checker.service';
+import * as jwt from 'jsonwebtoken';
 
 @Injectable()
 export class AuthService {
   // --- Password Reset ---
   private resetCodes: Map<string, string> = new Map(); // email -> code
+  // --- Email verification codes (email -> code)
+  private verificationCodes: Map<string, string> = new Map();
 
   async requestResetPasswordCode(email: string) {
     // Check if user exists
@@ -301,9 +304,11 @@ export class AuthService {
           subscriptionStatus: 'ACTIVE',
           paymentStatus: 'non_payed',
         });
-        const savedArtisan = await this.artisanRepo.save(artisan);
-        await this.mailService.sendVerificationCode(savedArtisan.email, verificationCode);
-        return savedArtisan;
+  const savedArtisan = await this.artisanRepo.save(artisan);
+  await this.mailService.sendVerificationCode(savedArtisan.email, verificationCode);
+  // Persist verification code server-side so it can be verified later
+  this.verificationCodes.set(savedArtisan.email, verificationCode);
+  return savedArtisan;
       }
 
       if (data.role === Role.ETABLISSEMENT) {
@@ -342,9 +347,10 @@ export class AuthService {
           subscriptionStatus: 'ACTIVE',
           paymentStatus: 'non_payed',
         });
-        const savedEtab = await this.etabRepo.save(etab);
-        await this.mailService.sendVerificationCode(savedEtab.email, verificationCode);
-        return savedEtab;
+  const savedEtab = await this.etabRepo.save(etab);
+  await this.mailService.sendVerificationCode(savedEtab.email, verificationCode);
+  this.verificationCodes.set(savedEtab.email, verificationCode);
+  return savedEtab;
       }
 
       const userData = data as any;
@@ -375,9 +381,10 @@ export class AuthService {
         subscriptionStatus: 'ACTIVE',
         paymentStatus: 'non_payed',
       });
-      const savedUser = await this.userRepo.save(user);
-      await this.mailService.sendVerificationCode(savedUser.email, verificationCode);
-      return savedUser;
+  const savedUser = await this.userRepo.save(user);
+  await this.mailService.sendVerificationCode(savedUser.email, verificationCode);
+  this.verificationCodes.set(savedUser.email, verificationCode);
+  return savedUser;
     } catch (error) {
       console.error('❌ Registration error:', error);
       throw new BadRequestException(error?.message || 'Registration failed');
@@ -387,6 +394,54 @@ export class AuthService {
   // --- List all artisans ---
   async getAllArtisans() {
     return this.artisanRepo.find();
+  }
+  // --- Verify email with code for a given role. Returns user data and userType.
+  async verifyEmail(role: string, email: string, code: string) {
+    try {
+      if (!email || !code) throw new BadRequestException('Email and code are required');
+
+      const savedCode = this.verificationCodes.get(email);
+      if (!savedCode || savedCode !== code) {
+        throw new BadRequestException('Invalid verification code');
+      }
+
+      // Find the account depending on role
+      let account: any = null;
+      let userType: 'user' | 'artisan' | 'etablissement' = 'user';
+
+      if (role === 'artisan') {
+        account = await this.artisanRepo.findOne({ where: { email } });
+        userType = 'artisan';
+      } else if (role === 'etablissement') {
+        account = await this.etabRepo.findOne({ where: { email } });
+        userType = 'etablissement';
+      } else {
+        account = await this.userRepo.findOne({ where: { email } });
+        userType = 'user';
+      }
+
+      if (!account) throw new BadRequestException('Account not found');
+
+      // Mark as verified if model has a field (best-effort)
+      try {
+        if ('isVerified' in account) {
+          await this.artisanRepo.manager.update(account.constructor, account.id, { isVerified: true });
+        }
+      } catch (e) {
+        // ignore update failures
+      }
+
+      // Remove verification code once used
+      this.verificationCodes.delete(email);
+
+      const { password: _, confirmPassword: __, ...accountWithoutPassword } = account;
+
+      // Return account data and userType. Note: no JWT is issued here; frontend can call login if a token is needed.
+      return { user: accountWithoutPassword, userType, message: 'Email verified' };
+    } catch (error) {
+      console.error('❌ verifyEmail error:', error);
+      throw new BadRequestException(error?.message || 'Verification failed');
+    }
   }
 
   // --- Get artisans by specialty ---
@@ -459,6 +514,8 @@ export class AuthService {
       throw new BadRequestException('Login failed');
     }
   }
+
+
 
   // --- Get User Name ---
   async getUserName(idOrEmail: { id?: number; email?: string }) {

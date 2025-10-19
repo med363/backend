@@ -363,6 +363,8 @@ export class AuthController {
     return this.authService.createArtisanEmbaucheRequest(body.artisanId, body.etablissementId);
   }
 
+
+
   // Generic registration
   @Post('register')
   @UseInterceptors(FileFieldsInterceptor([
@@ -411,6 +413,14 @@ export class AuthController {
       dto.cv = files.cv[0].filename;
     }
     return this.authService.register(dto);
+  }
+  // --- Verify email for user/artisan/etablissement ---
+  @Post('verify-email/:role')
+  async verifyEmail(
+    @Param('role') role: string,
+    @Body() body: { email: string; code: string }
+  ) {
+    return this.authService.verifyEmail(role, body.email, body.code);
   }
 
   // --- Etablissements with offres endpoint ---
