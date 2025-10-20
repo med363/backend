@@ -423,6 +423,16 @@ export class AuthController {
     return this.authService.verifyEmail(role, body.email, body.code);
   }
 
+  // --- Resend verification code for user/artisan/etablissement ---
+@Post('resend-verification/:role')
+async resendVerificationCode(
+  @Param('role') role: string,
+  @Body() body: { email: string }
+) {
+  return this.authService.resendVerificationCode(role, body.email);
+}
+
+
   // --- Etablissements with offres endpoint ---
   @Get('etablissements-with-offres')
   async getEtablissementsWithOffres(@Query('requesterEmail') requesterEmail?: string) {
@@ -470,6 +480,8 @@ export class AuthController {
         };
       }
     }
+
+    
 
     // Get full artisans with subscription check
     return await this.authService.getArtisansWithOffresFiltered();

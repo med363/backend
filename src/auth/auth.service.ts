@@ -114,6 +114,57 @@ export class AuthService {
     }));
   }
 
+  // --- Resend verification code for user/artisan/etablissement ---
+async resendVerificationCode(role: string, email: string) {
+  try {
+    console.log(`🔄 Resending verification code for ${role}:`, email);
+    
+    // Find the user based on role
+    let user: any;
+    
+    switch (role) {
+      case 'user':
+        user = await this.userRepo.findOne({ where: { email } });
+        break;
+      case 'artisan':
+        user = await this.artisanRepo.findOne({ where: { email } });
+        break;
+      case 'etablissement':
+        user = await this.etabRepo.findOne({ where: { email } });
+        break;
+      default:
+        throw new BadRequestException('Invalid role');
+    }
+    
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+    
+    // Generate new verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store the new code in memory (same as registration)
+    this.verificationCodes.set(email, verificationCode);
+    
+    console.log(`✅ New verification code generated for ${email}: ${verificationCode}`);
+    
+    // Send email with new verification code
+    await this.mailService.sendVerificationCode(email, verificationCode);
+    
+    return {
+      success: true,
+      message: 'Verification code sent successfully',
+    };
+  } catch (error) {
+    console.error('❌ Resend verification code error:', error);
+    throw new BadRequestException(error?.message || 'Failed to resend verification code');
+  }
+}
+
+// --- Helper method to get verification code (for debug endpoint) ---
+getVerificationCode(email: string): string | undefined {
+  return this.verificationCodes.get(email);
+}
   // --- Get artisans by type ---
   async getArtisansByType(type: string) {
     const artisans = await this.artisanRepo.find({ where: { artisanType: type } });
